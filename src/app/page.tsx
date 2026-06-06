@@ -24,14 +24,13 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: text.trim(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -93,16 +92,20 @@ export default function Home() {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendMessage(input);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      sendMessage(input);
     }
   };
 
   const handleSuggestion = (text: string) => {
-    setInput(text);
-    setTimeout(() => inputRef.current?.focus(), 0);
+    sendMessage(text);
   };
 
   const suggestions = [
@@ -111,6 +114,18 @@ export default function Home() {
     { icon: BookOpen, label: "Walk me through your resume", color: "text-emerald-600" },
     { icon: Calendar, label: "Book an interview", color: "text-orange-600" },
   ];
+
+  // Only show booking widget if user actually asked to book/schedule
+  const shouldShowBooking = (msgIndex: number) => {
+    const bookingKeywords = /\b(book|schedule|availability|calendar|slot|meeting time|set up a call|book.*interview)\b/i;
+    // Check the user message that preceded this assistant message
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        return bookingKeywords.test(messages[i].content);
+      }
+    }
+    return false;
+  };
 
   return (
     <div className="flex flex-col h-screen bg-[#fafbff]">
@@ -176,7 +191,7 @@ export default function Home() {
         ) : (
           /* Messages */
           <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
-            {messages.map((message) => (
+            {messages.map((message, index) => (
               <div
                 key={message.id}
                 className={`flex gap-3 ${
@@ -197,7 +212,7 @@ export default function Home() {
                 >
                   {message.content ? (
                     <>
-                      {message.content.includes("[BOOKING_WIDGET]") ? (
+                      {message.content.includes("[BOOKING_WIDGET]") && shouldShowBooking(index) ? (
                         <div>
                           <p className="mb-3">{message.content.replace("[BOOKING_WIDGET]", "").trim()}</p>
                           <iframe
@@ -208,7 +223,7 @@ export default function Home() {
                           />
                         </div>
                       ) : (
-                        message.content
+                        message.content.replace("[BOOKING_WIDGET]", "").trim()
                       )}
                     </>
                   ) : (
