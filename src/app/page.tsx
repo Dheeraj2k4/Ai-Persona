@@ -196,9 +196,10 @@ export default function Home() {
                   }`}
                 >
                   {message.content || (
-                    <span className="inline-flex items-center gap-2 text-gray-400">
-                      <Loader2 size={14} className="animate-spin" />
-                      Thinking...
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
                     </span>
                   )}
                 </div>
@@ -209,6 +210,23 @@ export default function Home() {
                 )}
               </div>
             ))}
+
+            {/* Typing indicator */}
+            {isLoading && messages[messages.length - 1]?.role === "user" && (
+              <div className="flex gap-3 justify-start">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                  <Bot size={14} className="text-white" />
+                </div>
+                <div className="px-4 py-3 rounded-2xl bg-white border border-gray-100 rounded-bl-md shadow-sm">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
         )}
