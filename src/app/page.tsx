@@ -9,6 +9,35 @@ interface Message {
   content: string;
 }
 
+// Simple markdown to HTML converter
+function formatMarkdown(text: string): string {
+  let html = text
+    // Escape HTML entities
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    // Bold: **text** or __text__
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/__(.*?)__/g, "<strong>$1</strong>")
+    // Italic: *text* or _text_
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/(?<!\w)_(.*?)_(?!\w)/g, "<em>$1</em>")
+    // Bullet points: lines starting with - or *
+    .replace(/^[-*+]\s+(.+)$/gm, "<li>$1</li>")
+    // Numbered lists: lines starting with 1. 2. etc.
+    .replace(/^\d+\.\s+(.+)$/gm, "<li>$1</li>")
+    // Wrap consecutive <li> in <ul>
+    .replace(/((<li>.*<\/li>\n?)+)/g, "<ul class='list-disc pl-4 my-1 space-y-0.5'>$1</ul>")
+    // Line breaks
+    .replace(/\n/g, "<br/>");
+  
+  // Clean up <br/> inside <ul>
+  html = html.replace(/<ul([^>]*)><br\/>/g, "<ul$1>").replace(/<br\/><\/ul>/g, "</ul>");
+  html = html.replace(/<\/li><br\/>/g, "</li>");
+  
+  return html;
+}
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -204,9 +233,9 @@ export default function Home() {
                   </div>
                 )}
                 <div
-                  className={`${message.content?.includes("[BOOKING_WIDGET]") ? "max-w-[90%]" : "max-w-[75%]"} px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                  className={`${message.content?.includes("[BOOKING_WIDGET]") ? "max-w-[90%]" : "max-w-[75%]"} px-4 py-3 rounded-2xl text-sm leading-relaxed ${
                     message.role === "user"
-                      ? "bg-purple-600 text-white rounded-br-md"
+                      ? "bg-purple-600 text-white rounded-br-md whitespace-pre-wrap"
                       : "bg-white border border-gray-100 text-gray-700 rounded-bl-md shadow-sm"
                   }`}
                 >
@@ -214,7 +243,7 @@ export default function Home() {
                     <>
                       {message.content.includes("[BOOKING_WIDGET]") && shouldShowBooking(index) ? (
                         <div>
-                          <p className="mb-3">{message.content.replace("[BOOKING_WIDGET]", "").trim()}</p>
+                          <div className="mb-3" dangerouslySetInnerHTML={{ __html: formatMarkdown(message.content.replace("[BOOKING_WIDGET]", "").trim()) }} />
                           <iframe
                             src="https://cal.com/dheeraj-talapagala-uzh1gt/30min?embed=true&layout=month_view"
                             className="w-full border-0 rounded-lg"
@@ -222,8 +251,10 @@ export default function Home() {
                             title="Book an interview with Dheeraj"
                           />
                         </div>
+                      ) : message.role === "assistant" ? (
+                        <div dangerouslySetInnerHTML={{ __html: formatMarkdown(message.content.replace("[BOOKING_WIDGET]", "").trim()) }} />
                       ) : (
-                        message.content.replace("[BOOKING_WIDGET]", "").trim()
+                        message.content
                       )}
                     </>
                   ) : (
