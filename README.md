@@ -56,7 +56,7 @@ An AI persona that you can **call**, **chat with**, and use to **book an intervi
 |---------|------|
 | **Chat** | [Deployed Vercel URL] |
 | **Voice** | Call: [Phone Number from Vapi] |
-| **Book Interview** | https://cal.com/dheeraj-talapala-uzhigt/30min |
+| **Book Interview** | https://cal.com/dheeraj-talapagala-uzh1gt/30min |
 
 ## ✨ Features
 

@@ -18,7 +18,7 @@ export async function POST(req: Request) {
           const calApiKey = process.env.CAL_COM_API_KEY;
           if (!calApiKey) {
             return NextResponse.json({
-              result: "I can help you book an interview! Please visit https://cal.com/dheeraj-talapagala to see available slots and book directly.",
+              result: "I can help you book an interview! Please visit https://cal.com/dheeraj-talapagala-uzh1gt/30min to see available slots and book directly.",
             });
           }
 
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
           }
 
           return NextResponse.json({
-            result: "Let me help you book a time. You can pick a slot at https://cal.com/dheeraj-talapala-uzhigt/30min — or tell me your preferred day and time, and I'll guide you through it.",
+            result: "Let me help you book a time. You can pick a slot at https://cal.com/dheeraj-talapagala-uzh1gt/30min — or tell me your preferred day and time, and I'll guide you through it.",
           });
         }
 
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
           const calApiKey = process.env.CAL_COM_API_KEY;
           if (!calApiKey) {
             return NextResponse.json({
-              result: `Great! To confirm the booking, please visit https://cal.com/dheeraj-talapala-uzhigt/30min and select your preferred time. Dheeraj will receive the confirmation automatically.`,
+              result: `Great! To confirm the booking, please visit https://cal.com/dheeraj-talapagala-uzh1gt/30min and select your preferred time. Dheeraj will receive the confirmation automatically.`,
             });
           }
 
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
           }
 
           return NextResponse.json({
-            result: `I'll direct you to the booking page. Please visit https://cal.com/dheeraj-talapala-uzhigt/30min to confirm your preferred slot.`,
+            result: `I'll direct you to the booking page. Please visit https://cal.com/dheeraj-talapagala-uzh1gt/30min to confirm your preferred slot.`,
           });
         }
 

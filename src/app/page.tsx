@@ -126,7 +126,7 @@ export default function Home() {
             Call Agent
           </a>
           <a
-            href="https://cal.com/dheeraj-talapala-uzhigt/30min"
+            href="https://cal.com/dheeraj-talapagala-uzh1gt/30min"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 transition-colors shadow-md shadow-purple-200"
@@ -189,13 +189,29 @@ export default function Home() {
                   </div>
                 )}
                 <div
-                  className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                  className={`${message.content?.includes("[BOOKING_WIDGET]") ? "max-w-[90%]" : "max-w-[75%]"} px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
                     message.role === "user"
                       ? "bg-purple-600 text-white rounded-br-md"
                       : "bg-white border border-gray-100 text-gray-700 rounded-bl-md shadow-sm"
                   }`}
                 >
-                  {message.content || (
+                  {message.content ? (
+                    <>
+                      {message.content.includes("[BOOKING_WIDGET]") ? (
+                        <div>
+                          <p className="mb-3">{message.content.replace("[BOOKING_WIDGET]", "").trim()}</p>
+                          <iframe
+                            src="https://cal.com/dheeraj-talapagala-uzh1gt/30min?embed=true&layout=month_view"
+                            className="w-full border-0 rounded-lg"
+                            style={{ height: "450px", minWidth: "300px" }}
+                            title="Book an interview with Dheeraj"
+                          />
+                        </div>
+                      ) : (
+                        message.content
+                      )}
+                    </>
+                  ) : (
                     <span className="inline-flex items-center gap-1">
                       <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
                       <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
