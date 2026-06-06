@@ -10,11 +10,9 @@
     "ingest": "tsx scripts/ingest.ts"
   },
   "dependencies": {
-    "@ai-sdk/google": "^3.0.80",
     "@ai-sdk/openai": "^3.0.68",
     "@upstash/vector": "^1.2.3",
     "ai": "^6.0.196",
-    "framer-motion": "^12.40.0",
     "lucide-react": "^1.17.0",
     "next": "16.2.7",
     "react": "19.2.4",

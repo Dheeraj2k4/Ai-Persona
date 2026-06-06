@@ -31,16 +31,28 @@ export async function vectorSearch(
 ): Promise<VectorSearchResult[]> {
   try {
     const results = await getIndex().query({
-      data: query, // Upstash embeds this automatically when index has an embedding model
+      data: query,
       topK,
       includeMetadata: true,
+      includeData: true,
     });
 
-    return results.map((r) => ({
-      content: (r.metadata as { content: string })?.content || "",
-      source: (r.metadata as { source: string })?.source || "unknown",
-      score: r.score,
-    }));
+    console.log(`[Vector] Got ${results.length} results for query: "${query.substring(0, 50)}..."`);
+
+    return results
+      .map((r) => {
+        // Try metadata.content first, then fall back to data field
+        const metadata = r.metadata as Record<string, string> | undefined;
+        const content = metadata?.content || (r as unknown as { data?: string }).data || "";
+        const source = metadata?.source || "unknown";
+
+        return {
+          content,
+          source,
+          score: r.score,
+        };
+      })
+      .filter((r) => r.content.length > 0); // Filter out empty results
   } catch (error) {
     console.error("Vector search error:", error);
     return [];
