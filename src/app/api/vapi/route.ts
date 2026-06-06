@@ -1,20 +1,34 @@
 import { NextResponse } from "next/server";
 import { retrieveRelevantContext, formatContextForLLM } from "@/lib/retriever";
 
+const CAL_API_BASE = "https://api.cal.com/v2";
+const CAL_EVENT_TYPE_ID = process.env.CAL_EVENT_TYPE_ID || "5920487";
+
+function getCalHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${process.env.CAL_COM_API_KEY}`,
+    "cal-api-version": "2024-09-04",
+  };
+}
+
 // Vapi sends webhook requests for tool calls (function calling)
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { message } = body;
 
+    console.log("[Vapi] Received event:", message?.type, JSON.stringify(body).slice(0, 200));
+
     // Handle different Vapi webhook event types
     if (message?.type === "function-call") {
       const functionName = message.functionCall?.name;
       const parameters = message.functionCall?.parameters;
 
+      console.log("[Vapi] Function call:", functionName, parameters);
+
       switch (functionName) {
         case "check_availability": {
-          // Call Cal.com API to check available slots
           const calApiKey = process.env.CAL_COM_API_KEY;
           if (!calApiKey) {
             return NextResponse.json({
@@ -23,23 +37,44 @@ export async function POST(req: Request) {
           }
 
           try {
+            // Get slots for next 7 days
+            const startDate = parameters?.dateFrom || new Date().toISOString().split("T")[0];
+            const endDate = parameters?.dateTo || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
             const response = await fetch(
-              `https://api.cal.com/v1/availability?apiKey=${calApiKey}&dateFrom=${parameters?.dateFrom || new Date().toISOString().split("T")[0]}&dateTo=${parameters?.dateTo || ""}`,
-              { headers: { "Content-Type": "application/json" } }
+              `${CAL_API_BASE}/slots?eventTypeId=${CAL_EVENT_TYPE_ID}&start=${startDate}&end=${endDate}&timeZone=Asia/Kolkata`,
+              { headers: getCalHeaders() }
             );
 
             if (response.ok) {
               const data = await response.json();
+              const slots = data.data || {};
+              // Format slots nicely for voice
+              const slotSummary = Object.entries(slots)
+                .slice(0, 3) // Show max 3 days
+                .map(([date, times]) => {
+                  const timeList = (times as Array<{start: string}>).slice(0, 3).map(t => {
+                    const d = new Date(t.start);
+                    return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+                  }).join(", ");
+                  return `${date}: ${timeList}`;
+                })
+                .join(". ");
+
               return NextResponse.json({
-                result: `Here are the available slots: ${JSON.stringify(data.slots || data)}. Would you like me to book one of these?`,
+                result: slotSummary
+                  ? `Here are some available slots: ${slotSummary}. Would you like me to book one of these?`
+                  : "I don't see any available slots in the next few days. Please try visiting https://cal.com/dheeraj-talapagala-uzh1gt/30min to check further out.",
               });
             }
-          } catch {
-            // Fallback to booking link
+
+            console.error("[Vapi] Cal.com slots error:", await response.text());
+          } catch (err) {
+            console.error("[Vapi] Cal.com slots exception:", err);
           }
 
           return NextResponse.json({
-            result: "Let me help you book a time. You can pick a slot at https://cal.com/dheeraj-talapagala-uzh1gt/30min — or tell me your preferred day and time, and I'll guide you through it.",
+            result: "Let me help you book a time. You can pick a slot at https://cal.com/dheeraj-talapagala-uzh1gt/30min — or tell me your preferred day and time.",
           });
         }
 
@@ -47,35 +82,50 @@ export async function POST(req: Request) {
           const calApiKey = process.env.CAL_COM_API_KEY;
           if (!calApiKey) {
             return NextResponse.json({
-              result: `Great! To confirm the booking, please visit https://cal.com/dheeraj-talapagala-uzh1gt/30min and select your preferred time. Dheeraj will receive the confirmation automatically.`,
+              result: `To confirm the booking, please visit https://cal.com/dheeraj-talapagala-uzh1gt/30min and select your preferred time.`,
             });
           }
 
-          // Attempt to book via Cal.com API
           try {
-            const response = await fetch(
-              `https://api.cal.com/v1/bookings?apiKey=${calApiKey}`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  eventTypeId: process.env.CAL_EVENT_TYPE_ID,
-                  start: parameters?.datetime,
-                  name: parameters?.name || "Interview Candidate",
-                  email: parameters?.email || "",
-                  timeZone: parameters?.timezone || "Asia/Kolkata",
-                }),
-              }
-            );
+            const bookingBody = {
+              start: parameters?.datetime,
+              eventTypeId: Number(CAL_EVENT_TYPE_ID),
+              attendee: {
+                name: parameters?.name || "Interview Candidate",
+                email: parameters?.email || "candidate@example.com",
+                timeZone: parameters?.timezone || "Asia/Kolkata",
+                language: "en",
+              },
+              metadata: { source: "vapi-voice-agent" },
+            };
 
-            if (response.ok) {
-              const booking = await response.json();
+            console.log("[Vapi] Booking request:", JSON.stringify(bookingBody));
+
+            const response = await fetch(`${CAL_API_BASE}/bookings`, {
+              method: "POST",
+              headers: {
+                ...getCalHeaders(),
+                "cal-api-version": "2026-02-25",
+              },
+              body: JSON.stringify(bookingBody),
+            });
+
+            const responseText = await response.text();
+            console.log("[Vapi] Cal.com booking response:", response.status, responseText);
+
+            if (response.ok || response.status === 201) {
+              const booking = JSON.parse(responseText);
               return NextResponse.json({
-                result: `Done! I've booked an interview for ${parameters?.datetime}. Dheeraj will receive the confirmation. Booking reference: ${booking.id || "confirmed"}.`,
+                result: `Done! I've booked an interview for ${parameters?.datetime}. Dheeraj will receive the confirmation. You should get a calendar invite shortly.`,
+              });
+            } else {
+              console.error("[Vapi] Booking failed:", responseText);
+              return NextResponse.json({
+                result: `I wasn't able to confirm the booking automatically. Please visit https://cal.com/dheeraj-talapagala-uzh1gt/30min to book directly — it only takes a moment.`,
               });
             }
-          } catch {
-            // Fallback
+          } catch (err) {
+            console.error("[Vapi] Booking exception:", err);
           }
 
           return NextResponse.json({
@@ -112,42 +162,50 @@ export async function POST(req: Request) {
             messages: [
               {
                 role: "system",
-                content: `You are Dheeraj Talapagala's AI representative on a phone call. Keep responses SHORT (2-3 sentences). Be natural and conversational. Only answer from the knowledge provided by the get_knowledge function. If unsure, say so.`,
+                content: `You are Dheeraj Talapagala's AI representative on a phone call. Keep responses SHORT (2-3 sentences). Be natural and conversational.
+
+IMPORTANT RULES:
+- Use the get_knowledge function to answer ANY question about Dheeraj's background, skills, projects, or experience. Do NOT answer from memory.
+- When someone wants to book an interview, FIRST use check_availability to show available times, THEN use book_meeting with the confirmed datetime.
+- For booking, you MUST collect: their preferred date/time. Ask for their name and email too.
+- The datetime for book_meeting must be in ISO 8601 UTC format like "2026-06-10T09:00:00Z"
+- If unsure about something, say so and offer to help with something else.
+- Never make up information. Only use what get_knowledge returns.`,
               },
             ],
             functions: [
               {
                 name: "check_availability",
-                description: "Check Dheeraj's calendar availability for booking an interview",
+                description: "Check Dheeraj's calendar availability for the next few days to find open interview slots",
                 parameters: {
                   type: "object",
                   properties: {
-                    dateFrom: { type: "string", description: "Start date (YYYY-MM-DD)" },
-                    dateTo: { type: "string", description: "End date (YYYY-MM-DD)" },
+                    dateFrom: { type: "string", description: "Start date in YYYY-MM-DD format" },
+                    dateTo: { type: "string", description: "End date in YYYY-MM-DD format" },
                   },
                 },
               },
               {
                 name: "book_meeting",
-                description: "Book an interview meeting with Dheeraj",
+                description: "Book a confirmed interview meeting with Dheeraj after the caller has chosen a specific time slot",
                 parameters: {
                   type: "object",
                   properties: {
-                    datetime: { type: "string", description: "Proposed datetime" },
-                    name: { type: "string", description: "Caller's name" },
-                    email: { type: "string", description: "Caller's email" },
-                    timezone: { type: "string", description: "Caller's timezone" },
+                    datetime: { type: "string", description: "The confirmed meeting time in ISO 8601 UTC format, e.g. 2026-06-10T09:00:00Z" },
+                    name: { type: "string", description: "Caller's full name" },
+                    email: { type: "string", description: "Caller's email address for calendar invite" },
+                    timezone: { type: "string", description: "Caller's timezone, e.g. Asia/Kolkata" },
                   },
-                  required: ["datetime"],
+                  required: ["datetime", "name", "email"],
                 },
               },
               {
                 name: "get_knowledge",
-                description: "Retrieve information about Dheeraj's background, skills, projects, or experience",
+                description: "Retrieve information about Dheeraj's background, skills, projects, or experience from his knowledge base",
                 parameters: {
                   type: "object",
                   properties: {
-                    query: { type: "string", description: "The question or topic to look up" },
+                    query: { type: "string", description: "The question or topic to look up about Dheeraj" },
                   },
                   required: ["query"],
                 },
