@@ -7,6 +7,7 @@ import { retrieveRelevantContext, formatContextForLLM } from "@/lib/retriever";
 const groq = createOpenAI({
   baseURL: "https://api.groq.com/openai/v1",
   apiKey: process.env.GROQ_API_KEY,
+  name: "groq",
 });
 
 export async function POST(req: Request) {
@@ -58,7 +59,7 @@ Answer the user's question based on the retrieved context above. If the context 
       return new Response("No LLM API key configured", { status: 500 });
     }
 
-    const model = groq("llama-3.1-8b-instant");
+    const model = groq.chat("llama-3.1-8b-instant");
     console.log(`[LLM] Using groq`);
 
     const result = streamText({
