@@ -108,7 +108,7 @@ export async function POST(req: Request) {
           firstMessage: "Hi! I'm Dheeraj's AI representative. I can tell you about his background, skills, and projects, or help you schedule an interview. What would you like to know?",
           model: {
             provider: "groq",
-            model: "llama-3.1-70b-versatile",
+            model: "llama-3.3-70b-versatile",
             messages: [
               {
                 role: "system",
