@@ -81,9 +81,15 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
   if (!parameters?.datetime) {
     return "I need a specific date and time to book the meeting. Please ask the caller what date and time works for them.";
   }
-  if (!parameters?.name || !parameters?.email) {
-    return "I still need the caller's full name and email address before I can book. Please ask them for these details.";
+  if (!parameters?.name) {
+    return "I still need the caller's full name before I can book. Please ask them for their name.";
   }
+
+  // Email is optional — if not provided or garbled, use a placeholder
+  const callerEmail = parameters?.email && parameters.email.includes("@") 
+    ? parameters.email 
+    : "voice-caller@placeholder.local";
+  const callerPhone = parameters?.phone || "not provided";
 
   try {
     const bookingBody = {
@@ -91,11 +97,18 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
       eventTypeId: Number(CAL_EVENT_TYPE_ID),
       attendee: {
         name: parameters.name,
-        email: parameters.email,
+        email: callerEmail,
         timeZone: parameters?.timezone || "Asia/Kolkata",
         language: "en",
       },
-      metadata: { source: "vapi-voice-agent" },
+      metadata: { 
+        source: "vapi-voice-agent",
+        callerPhone: callerPhone,
+        callerName: parameters.name,
+      },
+      bookingFieldsResponses: {
+        notes: `Booked via AI voice agent. Caller phone: ${callerPhone}. Name: ${parameters.name}.${callerEmail !== "voice-caller@placeholder.local" ? " Email: " + callerEmail : " (email not collected)"}`,
+      },
     };
 
     console.log("[Vapi] Booking request:", JSON.stringify(bookingBody));
@@ -121,7 +134,10 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
       const displayHour = istHours > 12 ? istHours - 12 : istHours === 0 ? 12 : istHours;
       const displayMin = istMinutes.toString().padStart(2, "0");
       const istTime = `${displayHour}:${displayMin} ${period} IST`;
-      return `Done! I've booked an interview for ${parameters.name} on June ${bookDate.getUTCDate()} at ${istTime}. A calendar invite will be sent to ${parameters.email}.`;
+      const confirmMsg = callerEmail !== "voice-caller@placeholder.local"
+        ? `Done! I've booked an interview for ${parameters.name} on June ${bookDate.getUTCDate()} at ${istTime}. A calendar invite will be sent to ${callerEmail}.`
+        : `Done! I've booked an interview for ${parameters.name} on June ${bookDate.getUTCDate()} at ${istTime}. Dheeraj will have your phone number to confirm the details.`;
+      return confirmMsg;
     } else {
       console.error("[Vapi] Booking failed:", responseText);
       // Try to parse error for useful message
@@ -166,6 +182,10 @@ export async function POST(req: Request) {
 
     console.log("[Vapi] Received event:", message?.type, JSON.stringify(body).slice(0, 500));
 
+    // Extract caller phone number from Vapi call metadata
+    const callerPhone = message?.call?.customer?.number || body?.call?.customer?.number || "";
+    console.log("[Vapi] Caller phone:", callerPhone);
+
     // Handle tool-calls (new Vapi format)
     if (message?.type === "tool-calls") {
       const toolCalls = message.toolCallList || [];
@@ -177,6 +197,11 @@ export async function POST(req: Request) {
           (typeof toolCall.function.arguments === "string" ? JSON.parse(toolCall.function.arguments) : toolCall.function.arguments) 
           : {};
         const toolCallId = toolCall.id;
+
+        // Inject caller phone into book_meeting parameters
+        if (functionName === "book_meeting" && callerPhone) {
+          parameters.phone = callerPhone;
+        }
 
         console.log("[Vapi] Tool call:", functionName, parameters);
 
@@ -206,7 +231,12 @@ export async function POST(req: Request) {
     // Handle function-call (old Vapi format)
     if (message?.type === "function-call") {
       const functionName = message.functionCall?.name;
-      const parameters = message.functionCall?.parameters;
+      const parameters = message.functionCall?.parameters || {};
+
+      // Inject caller phone into book_meeting parameters
+      if (functionName === "book_meeting" && callerPhone) {
+        parameters.phone = callerPhone;
+      }
 
       console.log("[Vapi] Function call:", functionName, parameters);
 
