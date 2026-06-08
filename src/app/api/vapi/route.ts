@@ -70,13 +70,24 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
     return "To confirm the booking, please visit https://cal.com/dheeraj-talapagala-uzh1gt/30min and select your preferred time.";
   }
 
+  // Refuse to book if required fields are missing
+  if (!parameters?.datetime) {
+    return "I need a specific date and time to book the meeting. Could you please tell me when you'd like to schedule it?";
+  }
+  if (!parameters?.name) {
+    return "I need your full name to book the meeting. Could you please tell me your name?";
+  }
+  if (!parameters?.email) {
+    return "I need your email address to send the calendar invite. Could you please share your email?";
+  }
+
   try {
     const bookingBody = {
-      start: parameters?.datetime,
+      start: parameters.datetime,
       eventTypeId: Number(CAL_EVENT_TYPE_ID),
       attendee: {
-        name: parameters?.name || "Interview Candidate",
-        email: parameters?.email || "candidate@example.com",
+        name: parameters.name,
+        email: parameters.email,
         timeZone: parameters?.timezone || "Asia/Kolkata",
         language: "en",
       },
@@ -111,8 +122,12 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
 }
 
 async function handleGetKnowledge(parameters: Record<string, string>): Promise<string> {
-  const query = parameters?.query || "";
-  const chunks = await retrieveRelevantContext(query, 3);
+  let query = parameters?.query || "";
+  // Enrich short queries for better retrieval
+  if (query.length < 20) {
+    query = `Dheeraj Talapagala ${query}`;
+  }
+  const chunks = await retrieveRelevantContext(query, 5);
   const context = formatContextForLLM(chunks);
   return context || "I don't have specific information about that topic.";
 }
@@ -206,12 +221,17 @@ export async function POST(req: Request) {
                 content: `You are Dheeraj Talapagala's AI representative on a phone call. Keep responses SHORT (2-3 sentences). Be natural and conversational.
 
 IMPORTANT RULES:
-- Use the get_knowledge function to answer ANY question about Dheeraj's background, skills, projects, or experience. Do NOT answer from memory.
-- When someone wants to book an interview, FIRST use check_availability to show available times, THEN use book_meeting with the confirmed datetime.
-- For booking, you MUST collect: their preferred date/time. Ask for their name and email too.
+- Use the get_knowledge function to answer ANY question about Dheeraj — including education, CGPA, skills, projects, experience, contact info, or anything else. ALWAYS call get_knowledge first. Do NOT answer from memory or make up information.
+- BOOKING PROCESS (follow these steps IN ORDER, do NOT skip any):
+  1. Ask the caller what date and time works for them
+  2. Use check_availability to verify the slot is open
+  3. Ask for their FULL NAME (do not use any default or previous name)
+  4. Ask for their EMAIL ADDRESS (do not use any default or previous email)
+  5. Confirm all details back to the caller: date/time, name, and email
+  6. ONLY after the caller confirms, call book_meeting with the collected info
+- NEVER call book_meeting without having explicitly collected name, email, and datetime from the caller in THIS conversation.
 - The datetime for book_meeting must be in ISO 8601 UTC format like "2026-06-10T09:00:00Z"
-- If unsure about something, say so and offer to help with something else.
-- Never make up information. Only use what get_knowledge returns.`,
+- If unsure about something, say so and offer to help with something else.`,
               },
             ],
             functions: [
