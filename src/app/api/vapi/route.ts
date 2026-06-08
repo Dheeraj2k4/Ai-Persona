@@ -84,11 +84,10 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
   if (!parameters?.name) {
     return "I still need the caller's full name before I can book. Please ask them for their name.";
   }
+  if (!parameters?.email) {
+    return "I still need the caller's email address before I can book. Please ask them for their email.";
+  }
 
-  // Email is optional — if not provided or garbled, use a placeholder
-  const callerEmail = parameters?.email && parameters.email.includes("@") 
-    ? parameters.email 
-    : "voice-caller@placeholder.local";
   const callerPhone = parameters?.phone || "not provided";
 
   try {
@@ -97,7 +96,7 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
       eventTypeId: Number(CAL_EVENT_TYPE_ID),
       attendee: {
         name: parameters.name,
-        email: callerEmail,
+        email: parameters.email,
         timeZone: parameters?.timezone || "Asia/Kolkata",
         language: "en",
       },
@@ -107,7 +106,7 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
         callerName: parameters.name,
       },
       bookingFieldsResponses: {
-        notes: `Booked via AI voice agent. Caller phone: ${callerPhone}. Name: ${parameters.name}.${callerEmail !== "voice-caller@placeholder.local" ? " Email: " + callerEmail : " (email not collected)"}`,
+        notes: `Booked via AI voice agent. Caller phone: ${callerPhone}. Name: ${parameters.name}. Email: ${parameters.email}`,
       },
     };
 
@@ -134,10 +133,7 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
       const displayHour = istHours > 12 ? istHours - 12 : istHours === 0 ? 12 : istHours;
       const displayMin = istMinutes.toString().padStart(2, "0");
       const istTime = `${displayHour}:${displayMin} ${period} IST`;
-      const confirmMsg = callerEmail !== "voice-caller@placeholder.local"
-        ? `Done! I've booked an interview for ${parameters.name} on June ${bookDate.getUTCDate()} at ${istTime}. A calendar invite will be sent to ${callerEmail}.`
-        : `Done! I've booked an interview for ${parameters.name} on June ${bookDate.getUTCDate()} at ${istTime}. Dheeraj will have your phone number to confirm the details.`;
-      return confirmMsg;
+      return `Done! I've booked an interview for ${parameters.name} on June ${bookDate.getUTCDate()} at ${istTime}. A calendar invite will be sent to ${parameters.email}. Caller phone: ${callerPhone}.`;
     } else {
       console.error("[Vapi] Booking failed:", responseText);
       // Try to parse error for useful message
