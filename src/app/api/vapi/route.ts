@@ -70,15 +70,12 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
     return "To confirm the booking, please visit https://cal.com/dheeraj-talapagala-uzh1gt/30min and select your preferred time.";
   }
 
-  // Refuse to book if required fields are missing
+  // Refuse to book if datetime is missing
   if (!parameters?.datetime) {
-    return "I need a specific date and time to book the meeting. Could you please tell me when you'd like to schedule it?";
+    return "I need a specific date and time to book the meeting. Please ask the caller what date and time works for them.";
   }
-  if (!parameters?.name) {
-    return "I need your full name to book the meeting. Could you please tell me your name?";
-  }
-  if (!parameters?.email) {
-    return "I need your email address to send the calendar invite. Could you please share your email?";
+  if (!parameters?.name || !parameters?.email) {
+    return "I still need the caller's full name and email address before I can book. Please ask them for these details.";
   }
 
   try {
@@ -100,7 +97,7 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
       method: "POST",
       headers: {
         ...getCalHeaders(),
-        "cal-api-version": "2026-02-25",
+        "cal-api-version": "2024-08-13",
       },
       body: JSON.stringify(bookingBody),
     });
@@ -109,9 +106,17 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
     console.log("[Vapi] Cal.com booking response:", response.status, responseText);
 
     if (response.ok || response.status === 201) {
-      return `Done! I've booked an interview for ${parameters?.datetime}. Dheeraj will receive the confirmation. You should get a calendar invite shortly.`;
+      return `Done! I've booked an interview for ${parameters.name} at ${parameters.datetime}. A calendar invite will be sent to ${parameters.email}.`;
     } else {
       console.error("[Vapi] Booking failed:", responseText);
+      // Try to parse error for useful message
+      try {
+        const errData = JSON.parse(responseText);
+        const errMsg = errData?.error?.message || errData?.message || "";
+        if (errMsg.toLowerCase().includes("slot")) {
+          return "That time slot is no longer available. Could you pick a different time?";
+        }
+      } catch { /* ignore parse error */ }
       return "I wasn't able to confirm the booking automatically. Please visit https://cal.com/dheeraj-talapagala-uzh1gt/30min to book directly.";
     }
   } catch (err) {
