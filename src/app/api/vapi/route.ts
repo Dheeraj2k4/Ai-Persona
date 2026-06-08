@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { retrieveRelevantContext, formatContextForLLM } from "@/lib/retriever";
 
+export const dynamic = "force-dynamic";
+
 const CAL_API_BASE = "https://api.cal.com/v2";
 const CAL_EVENT_TYPE_ID = process.env.CAL_EVENT_TYPE_ID || "5920487";
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
 
 function getCalHeaders() {
   return {
@@ -109,11 +117,17 @@ async function handleGetKnowledge(parameters: Record<string, string>): Promise<s
   return context || "I don't have specific information about that topic.";
 }
 
+// Handle CORS preflight requests
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 200, headers: CORS_HEADERS });
+}
+
 // Vapi sends webhook requests for tool calls (function calling)
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { message } = body;
+    // Vapi may send message at top level or nested under "message"
+    const message = body.message || body;
 
     console.log("[Vapi] Received event:", message?.type, JSON.stringify(body).slice(0, 500));
 
@@ -151,7 +165,7 @@ export async function POST(req: Request) {
         results.push({ toolCallId, result });
       }
 
-      return NextResponse.json({ results });
+      return NextResponse.json({ results }, { headers: CORS_HEADERS });
     }
 
     // Handle function-call (old Vapi format)
@@ -175,7 +189,7 @@ export async function POST(req: Request) {
           break;
       }
 
-      return NextResponse.json({ result });
+      return NextResponse.json({ result }, { headers: CORS_HEADERS });
     }
 
     // Handle assistant-request (Vapi asking for configuration)
@@ -240,20 +254,20 @@ IMPORTANT RULES:
             ],
           },
         },
-      });
+      }, { headers: CORS_HEADERS });
     }
 
-    return NextResponse.json({ status: "ok" });
+    return NextResponse.json({ status: "ok" }, { headers: CORS_HEADERS });
   } catch (error) {
     console.error("Vapi webhook error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 }
 
 // Vapi may also send GET requests for health checks
 export async function GET() {
-  return NextResponse.json({ status: "ok", service: "dheeraj-ai-vapi-webhook" });
+  return NextResponse.json({ status: "ok", service: "dheeraj-ai-vapi-webhook" }, { headers: CORS_HEADERS });
 }
