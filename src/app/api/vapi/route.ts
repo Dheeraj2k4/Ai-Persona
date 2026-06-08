@@ -43,17 +43,24 @@ async function handleCheckAvailability(parameters: Record<string, string>): Prom
       const slotSummary = Object.entries(slots)
         .slice(0, 3)
         .map(([date, times]) => {
-          const timeList = (times as Array<{start: string}>).slice(0, 3).map(t => {
+          const timeList = (times as Array<{start: string}>).slice(0, 4).map(t => {
+            // Convert UTC to IST (UTC+5:30) manually for reliable display
             const d = new Date(t.start);
-            return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+            const istHours = (d.getUTCHours() + 5) % 24 + (d.getUTCMinutes() + 30 >= 60 ? 1 : 0);
+            const istMinutes = (d.getUTCMinutes() + 30) % 60;
+            const period = istHours >= 12 ? "PM" : "AM";
+            const displayHour = istHours > 12 ? istHours - 12 : istHours === 0 ? 12 : istHours;
+            const displayMin = istMinutes.toString().padStart(2, "0");
+            // Also include the UTC ISO string so the LLM can use it directly for booking
+            return `${displayHour}:${displayMin} ${period} IST (UTC: ${t.start})`;
           }).join(", ");
           return `${date}: ${timeList}`;
         })
         .join(". ");
 
       return slotSummary
-        ? `Here are some available slots: ${slotSummary}. Would you like me to book one of these?`
-        : "I don't see any available slots in the next few days. Please visit https://cal.com/dheeraj-talapagala-uzh1gt/30min to check further out.";
+        ? `Available slots (India Standard Time): ${slotSummary}. Tell the caller these times in IST. When they pick one, use the UTC value in parentheses for booking.`
+        : "No available slots found in that date range. Ask if they'd like to check a different date.";
     }
 
     console.error("[Vapi] Cal.com slots error:", await response.text());
@@ -106,7 +113,15 @@ async function handleBookMeeting(parameters: Record<string, string>): Promise<st
     console.log("[Vapi] Cal.com booking response:", response.status, responseText);
 
     if (response.ok || response.status === 201) {
-      return `Done! I've booked an interview for ${parameters.name} at ${parameters.datetime}. A calendar invite will be sent to ${parameters.email}.`;
+      // Convert UTC datetime to IST for the confirmation message
+      const bookDate = new Date(parameters.datetime);
+      const istHours = (bookDate.getUTCHours() + 5) % 24 + (bookDate.getUTCMinutes() + 30 >= 60 ? 1 : 0);
+      const istMinutes = (bookDate.getUTCMinutes() + 30) % 60;
+      const period = istHours >= 12 ? "PM" : "AM";
+      const displayHour = istHours > 12 ? istHours - 12 : istHours === 0 ? 12 : istHours;
+      const displayMin = istMinutes.toString().padStart(2, "0");
+      const istTime = `${displayHour}:${displayMin} ${period} IST`;
+      return `Done! I've booked an interview for ${parameters.name} on June ${bookDate.getUTCDate()} at ${istTime}. A calendar invite will be sent to ${parameters.email}.`;
     } else {
       console.error("[Vapi] Booking failed:", responseText);
       // Try to parse error for useful message
