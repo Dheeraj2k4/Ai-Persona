@@ -54,8 +54,7 @@ An AI persona that you can **call**, **chat with**, and use to **book an intervi
 
 | Channel | Link |
 |---------|------|
-| **Chat** | [Deployed Vercel URL] |
-| **Voice** | Call: [Phone Number from Vapi] |
+| **Chat** | [https://ai-persona-seven-dusky.vercel.app/] |
 | **Book Interview** | https://cal.com/dheeraj-talapagala-uzh1gt/30min |
 
 ## ✨ Features
